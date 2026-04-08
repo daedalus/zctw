@@ -12,9 +12,22 @@ LOGENTRIES = len(CTWlogar)
 JACENTRIES = len(CTWjacar)
 ACCURACY = 128
 
+# Try to use Cython-accelerated CTWjac
+try:
+    import zctw._cython_ctw as _cython_mod
 
-def CTWjac(ent: int) -> int:
-    """Jacobian logarithm lookup."""
-    if -ent < JACENTRIES:
-        return CTWjacar[-ent]
-    return 0
+    _cython_mod.init_cython()
+    _CTWjac_cython = _cython_mod.ctw_jac
+
+    def CTWjac(ent: int) -> int:
+        """Jacobian logarithm lookup (Cython-accelerated)."""
+        if -ent < JACENTRIES:
+            return _CTWjac_cython(ent)
+        return 0
+except ImportError:
+
+    def CTWjac(ent: int) -> int:
+        """Jacobian logarithm lookup."""
+        if -ent < JACENTRIES:
+            return CTWjacar[-ent]
+        return 0
