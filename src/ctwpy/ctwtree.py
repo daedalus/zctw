@@ -4,7 +4,6 @@ This module handles finding and updating paths in the CTW trees and managing
 the array containing the data of the CTW trees.
 """
 
-
 from ctwpy.settings import MAX_TREEDEPTH, CTWSettings
 
 EMPTY_NODE = 0xFFFFFFFF
@@ -343,7 +342,7 @@ class CTWTree:
         self.rootindex = [0] * 8
         self.localindex = [0] * (MAX_TREEDEPTH + 1)
         self.localdepth: int = 0
-        self._ctxstring = [0] * (MAX_TREEDEPTH + 1)
+        self._ctxstring = [0] * (MAX_TREEDEPTH + 2)
 
     def tree_frozen(self) -> bool:
         """Check if tree structure is frozen."""

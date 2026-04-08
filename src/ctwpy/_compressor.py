@@ -17,6 +17,9 @@ class CTWCompressor:
     def __init__(self, settings: CTWSettings | None = None):
         """Initialize CTW compressor."""
         self.settings = settings if settings is not None else CTWSettings()
+        errors = check_settings(self.settings)
+        if errors:
+            raise ValueError(f"Invalid settings: {', '.join(errors)}")
         self._tree: CTWTree | None = None
         self._encoder: ArithmeticEncoder | None = None
         self._decoder: ArithmeticDecoder | None = None
@@ -32,10 +35,6 @@ class CTWCompressor:
 
     def encode(self, data: bytes) -> bytes:
         """Encode data using CTW."""
-        errors = check_settings(self.settings)
-        if errors:
-            raise ValueError(f"Invalid settings: {', '.join(errors)}")
-
         self._databytes = len(data)
 
         if self._databytes == 0:
@@ -141,7 +140,7 @@ class CTWCompressor:
         self._ctwinfo = [CTW_DATA_ZERO.copy() for _ in range(max_depth + 1)]
         self._dummy0info = [CTW_DATA_ZERO.copy() for _ in range(max_depth + 1)]
         self._dummy1info = [CTW_DATA_ZERO.copy() for _ in range(max_depth + 1)]
-        self._ctxstring = [0] * (max_depth + 1)
+        self._ctxstring = [0] * (max_depth + 2)
 
     def _encode_byte(self, u: int) -> None:
         """Encode a single byte."""

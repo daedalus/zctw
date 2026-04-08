@@ -4,6 +4,8 @@ Python implementation of Context Tree Weighting (CTW) lossless compression.
 
 [![PyPI](https://img.shields.io/pypi/v/ctwpy.svg)](https://pypi.org/project/ctwpy/)
 [![Python](https://img.shields.io/pypi/pyversions/ctwpy.svg)](https://pypi.org/project/ctwpy/)
+[![Coverage](https://codecov.io/gh/daedalus/ctwpy/branch/main/graph/badge.svg)](https://codecov.io/gh/daedalus/ctwpy)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 ## Install
 
