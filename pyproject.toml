@@ -1,6 +1,12 @@
 [build-system]
-requires = ["hatchling", "Cython>=0.29"]
-build-backend = "hatchling.build"
+requires = ["setuptools>=61.0", "wheel", "Cython>=0.29"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"zctw" = ["*.pyx", "*.pxd", "*.c"]
 
 [project]
 name = "zctw"
@@ -20,6 +26,7 @@ dev = [
     "mypy",
     "hatch",
     "pip-api",
+    "Cython>=0.29",
 ]
 test = [
     "pytest",
@@ -33,6 +40,7 @@ lint = [
     "mypy",
 ]
 all = ["zctw[dev,test,lint]"]
+cython = ["Cython>=0.29"]
 
 [project.scripts]
 zctw = "zctw.__main__:main"
@@ -41,12 +49,6 @@ zctw = "zctw.__main__:main"
 Homepage = "https://github.com/daedalus/zctw"
 Repository = "https://github.com/daedalus/zctw"
 Issues = "https://github.com/daedalus/zctw/issues"
-
-[tool.hatch.build.targets.wheel]
-packages = ["src/zctw"]
-
-[tool.hatch.build.targets.sdist]
-include = ["src/zctw"]
 
 [tool.ruff]
 line-length = 88
