@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "ctwpy"
+name = "zctw"
 version = "0.1.0"
 description = "Python implementation of Context Tree Weighting (CTW) lossless compression"
 readme = "README.md"
@@ -32,21 +32,21 @@ lint = [
     "ruff",
     "mypy",
 ]
-all = ["ctwpy[dev,test,lint]"]
+all = ["zctw[dev,test,lint]"]
 
 [project.scripts]
-ctwpy = "ctwpy.__main__:main"
+zctw = "zctw.__main__:main"
 
 [project.urls]
-Homepage = "https://github.com/daedalus/ctwpy"
-Repository = "https://github.com/daedalus/ctwpy"
-Issues = "https://github.com/daedalus/ctwpy/issues"
+Homepage = "https://github.com/daedalus/zctw"
+Repository = "https://github.com/daedalus/zctw"
+Issues = "https://github.com/daedalus/zctw/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/ctwpy"]
+packages = ["src/zctw"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src/ctwpy"]
+include = ["src/zctw"]
 
 [tool.ruff]
 line-length = 88

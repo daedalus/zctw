@@ -2,11 +2,11 @@
 
 import io
 
-from ctwpy.ctwproc import CTWProb, ctw_process, ctw_steps
-from ctwpy.ctwtree import CTW_DATA_ZERO, CTWTree, byte_bit, byte_prefix
-from ctwpy.header import read_header, write_header
-from ctwpy.larc import STEPHALF, ArithmeticDecoder, ArithmeticEncoder
-from ctwpy.settings import CTWSettings, check_settings
+from zctw.ctwproc import CTWProb, ctw_process, ctw_steps
+from zctw.ctwtree import CTW_DATA_ZERO, CTWTree, byte_bit, byte_prefix
+from zctw.header import read_header, write_header
+from zctw.larc import STEPHALF, ArithmeticDecoder, ArithmeticEncoder
+from zctw.settings import CTWSettings, check_settings
 
 MAX_TREEDEPTH = 12
 

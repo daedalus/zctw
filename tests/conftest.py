@@ -1,8 +1,8 @@
-"""Pytest configuration and fixtures for ctwpy tests."""
+"""Pytest configuration and fixtures for zctw tests."""
 
 import pytest
 
-from ctwpy import CTWCompressor, CTWSettings
+from zctw import CTWCompressor, CTWSettings
 
 
 @pytest.fixture

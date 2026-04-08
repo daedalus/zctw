@@ -1,6 +1,6 @@
 """Tests for CTWSettings."""
 
-from ctwpy.settings import CTWSettings, _is_power_of_2, check_settings
+from zctw.settings import CTWSettings, _is_power_of_2, check_settings
 
 
 class TestCTWSettingsDefaults:

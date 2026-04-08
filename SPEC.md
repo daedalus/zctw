@@ -1,8 +1,8 @@
-# SPEC.md — ctwpy
+# SPEC.md — zctw
 
 ## Purpose
 
-ctwpy is a Python implementation of the Context Tree Weighting (CTW) lossless compression algorithm. It provides both a Python library for programmatic compression/decompression and a CLI tool for encoding and decoding files.
+zctw is a Python implementation of the Context Tree Weighting (CTW) lossless compression algorithm. It provides both a Python library for programmatic compression/decompression and a CLI tool for encoding and decoding files.
 
 ## Scope
 
@@ -25,7 +25,7 @@ ctwpy is a Python implementation of the Context Tree Weighting (CTW) lossless co
 ### Library API
 
 ```python
-from ctwpy import CTWCompressor
+from zctw import CTWCompressor
 
 # Initialize compressor with settings
 compressor = CTWCompressor(
@@ -49,8 +49,8 @@ decompressed = compressor.decode(compressed: bytes) -> bytes
 ### CLI Interface
 
 ```bash
-ctwpy e <input_file> [<output_file>] [options]
-ctwpy d <input_file> [<output_file>] [options]
+zctw e <input_file> [<output_file>] [options]
+zctw d <input_file> [<output_file>] [options]
 ```
 
 **Options:**
@@ -66,8 +66,8 @@ ctwpy d <input_file> [<output_file>] [options]
 - `-lX`: Enable logging to file X
 
 **Output file defaults:**
-- Encode: `<input_file>.ctw`
-- Decode: `<input_file>.d` (removes .ctw extension)
+- Encode: `<input_file>.zctw`
+- Decode: `<input_file>.d` (removes .zctw extension)
 
 ### Data Structures
 

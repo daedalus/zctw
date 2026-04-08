@@ -4,7 +4,7 @@ This module handles finding and updating paths in the CTW trees and managing
 the array containing the data of the CTW trees.
 """
 
-from ctwpy.settings import MAX_TREEDEPTH, CTWSettings
+from zctw.settings import MAX_TREEDEPTH, CTWSettings
 
 EMPTY_NODE = 0xFFFFFFFF
 

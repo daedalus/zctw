@@ -1,4 +1,4 @@
-"""ctwpy - CLI entry point."""
+"""zctw - CLI entry point."""
 
 import argparse
 import os
@@ -10,7 +10,7 @@ def main() -> int:
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
         description="CTW (Context Tree Weighting) compression/decompression utility",
-        prog="ctwpy",
+        prog="zctw",
     )
     parser.add_argument(
         "input_file",
@@ -132,8 +132,8 @@ def main() -> int:
     else:
         mode = "e"
 
-    from ctwpy import CTWCompressor, CTWSettings
-    from ctwpy.settings import compression_level_to_settings
+    from zctw import CTWCompressor, CTWSettings
+    from zctw.settings import compression_level_to_settings
 
     print(
         "CTW (Context Tree Weighting) compression/decompression utility version 0.1",
@@ -302,8 +302,8 @@ def main() -> int:
 
 def test_file(input_file: str) -> int:
     """Test integrity of compressed file."""
-    from ctwpy import CTWCompressor, CTWSettings
-    from ctwpy.header import read_header
+    from zctw import CTWCompressor, CTWSettings
+    from zctw.header import read_header
 
     if input_file == "-":
         print("Error: cannot test stdin", file=sys.stderr)
@@ -319,7 +319,7 @@ def test_file(input_file: str) -> int:
 
         filesize, settings = read_header(compressed)
         compressor = CTWCompressor(CTWSettings())
-        decompressed = compressor.decode(compressed)
+        _ = compressor.decode(compressed)
 
         print(f"{input_file}: OK")
 

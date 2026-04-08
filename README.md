@@ -1,22 +1,22 @@
-# ctwpy
+# zctw
 
 Python implementation of Context Tree Weighting (CTW) lossless compression.
 
-[![PyPI](https://img.shields.io/pypi/v/ctwpy.svg)](https://pypi.org/project/ctwpy/)
-[![Python](https://img.shields.io/pypi/pyversions/ctwpy.svg)](https://pypi.org/project/ctwpy/)
-[![Coverage](https://codecov.io/gh/daedalus/ctwpy/branch/main/graph/badge.svg)](https://codecov.io/gh/daedalus/ctwpy)
+[![PyPI](https://img.shields.io/pypi/v/zctw.svg)](https://pypi.org/project/zctw/)
+[![Python](https://img.shields.io/pypi/pyversions/zctw.svg)](https://pypi.org/project/zctw/)
+[![Coverage](https://codecov.io/gh/daedalus/zctw/branch/main/graph/badge.svg)](https://codecov.io/gh/daedalus/zctw)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 ## Install
 
 ```bash
-pip install ctwpy
+pip install zctw
 ```
 
 ## Usage
 
 ```python
-from ctwpy import CTWCompressor, CTWSettings
+from zctw import CTWCompressor, CTWSettings
 
 # Use default settings
 compressor = CTWCompressor()
@@ -41,13 +41,13 @@ print(f"Decompressed matches: {original == decompressed}")
 
 ```bash
 # Encode a file
-ctwpy e input.txt output.ctw
+zctw e input.txt output.zctw
 
 # Decode a file
-ctwpy d output.ctw input_decoded.txt
+zctw d output.zctw input_decoded.txt
 
 # Show file info
-ctwpy i output.ctw
+zctw i output.zctw
 ```
 
 ### CLI Options
@@ -72,12 +72,12 @@ ctwpy i output.ctw
 class CTWSettings:
     treedepth: int          # max depth of trees, excluding root (default: 6)
     maxnrnodes: int         # max nodes in tree array (default: 4194304)
-    maxnrtries: int         # max tries in hash table (default: 32)
-    filebufsize: int        # actual file buffer size (default: 4194304)
-    maxfilebufsize: int     # max file buffer size (default: 4194304)
-    strictpruning: bool     # use strict pruning method (default: True)
-    maxlogbeta: int         # max value of logbeta (default: 1024)
-    rootweighting: bool     # perform weighting at root node (default: False)
+    maxnrtries: int        # max tries in hash table (default: 32)
+    filebufsize: int       # actual file buffer size (default: 4194304)
+    maxfilebufsize: int    # max file buffer size (default: 4194304)
+    strictpruning: bool    # use strict pruning method (default: True)
+    maxlogbeta: int        # max value of logbeta (default: 1024)
+    rootweighting: bool    # perform weighting at root node (default: False)
     use_zeroredundancy: bool # use zero-redundancy estimator (default: True)
 ```
 
@@ -93,8 +93,8 @@ class CTWCompressor:
 ## Development
 
 ```bash
-git clone https://github.com/daedalus/ctwpy.git
-cd ctwpy
+git clone https://github.com/daedalus/zctw.git
+cd zctw
 pip install -e ".[test]"
 
 # run tests

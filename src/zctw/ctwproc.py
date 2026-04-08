@@ -4,7 +4,7 @@ This module implements the mathematics of the CTW algorithm including
 the zero-redundancy estimator and KT-estimator.
 """
 
-from ctwpy.ctwmath import (
+from zctw.ctwmath import (
     ACCURACY,
     MAXCOUNTS,
     CTWjac,
@@ -12,8 +12,8 @@ from ctwpy.ctwmath import (
     CTWzlogpmax,
     CTWzlogpmin,
 )
-from ctwpy.ctwtree import CTWRecord
-from ctwpy.settings import CTWSettings
+from zctw.ctwtree import CTWRecord
+from zctw.settings import CTWSettings
 
 
 class CTWProb:

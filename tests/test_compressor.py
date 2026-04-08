@@ -2,7 +2,7 @@
 
 import pytest
 
-from ctwpy import CTWCompressor, CTWSettings
+from zctw import CTWCompressor, CTWSettings
 
 
 class TestEncodeEmptyInput:

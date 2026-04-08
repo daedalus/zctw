@@ -1,6 +1,6 @@
 """Precomputed tables for CTW mathematics - using exact C tables for binary compatibility."""
 
-from ctwpy._tables import CTWLOGAR, CTWZLOGPMAX, CTWZLOGPMIN, CTWJACAR
+from zctw._tables import CTWJACAR, CTWLOGAR, CTWZLOGPMAX, CTWZLOGPMIN
 
 CTWlogar = CTWLOGAR
 CTWzlogpmax = CTWZLOGPMAX

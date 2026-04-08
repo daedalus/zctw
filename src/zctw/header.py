@@ -1,7 +1,6 @@
 """CTW file header read/write module."""
 
-
-from ctwpy.settings import CTWSettings
+from zctw.settings import CTWSettings
 
 HEADERSIZE = 12
 CTWFILE_VERSION = 0

@@ -1,6 +1,6 @@
 """Arithmetic encoder/decoder module (LARC) - using exact C tables for binary compatibility."""
 
-import re
+from zctw._tables import AREXP, ARLOG
 
 ARENTRIES = 4096
 ACCUMSIZE = 13
@@ -8,24 +8,6 @@ ACCUMMASK = 8191
 DELAYREGSIZE = 24
 DELAYREGMASK = 0x00FFFFFF
 PPBUFSIZ = 2048
-
-
-def _parse_c_array(content: str, array_name: str) -> list:
-    """Parse a C array from header file content."""
-    pattern = rf"int {array_name}\[ARENTRIES\] = \{{(.*?)}};"
-    match = re.search(pattern, content, re.DOTALL)
-    if not match:
-        raise ValueError(f"Could not find {array_name} in C tables")
-
-    nums = re.findall(r"\d+", match.group(1))
-    return [int(n) for n in nums]
-
-
-with open("/home/dclavijo/my_code/daedalus-repos/ctw/ctwlarc-tables.h") as f:
-    c_content = f.read()
-
-ARexp = _parse_c_array(c_content, "ARexp")
-ARlog = _parse_c_array(c_content, "ARlog")
 
 
 class ArithmeticEncoder:
@@ -127,19 +109,19 @@ class ArithmeticEncoder:
         bigpntr = self.intpntr + instep
         if symbsmall:
             if bigpntr < ARENTRIES:
-                self.accum += 2 * ARexp[bigpntr]
+                self.accum += 2 * AREXP[bigpntr]
                 if self.accum > ACCUMMASK:
                     self.accum &= ACCUMMASK
                     self.delayreg += 1
-                self.intpntr = ARlog[ARexp[self.intpntr] - ARexp[bigpntr]]
+                self.intpntr = ARLOG[AREXP[self.intpntr] - AREXP[bigpntr]]
             else:
                 bigpntr -= ARENTRIES
-                self.accum += ARexp[bigpntr]
+                self.accum += AREXP[bigpntr]
                 if self.accum > ACCUMMASK:
                     self.accum &= ACCUMMASK
                     self.delayreg += 1
                 self.intpntr = (
-                    ARlog[2 * ARexp[self.intpntr] - ARexp[bigpntr]] + ARENTRIES
+                    ARLOG[2 * AREXP[self.intpntr] - AREXP[bigpntr]] + ARENTRIES
                 )
         else:
             self.intpntr = bigpntr
@@ -254,7 +236,7 @@ class ArithmeticDecoder:
         bigpntr = self.intpntr + instep
 
         if bigpntr < ARENTRIES:
-            thraccum = self.accum + 2 * ARexp[bigpntr]
+            thraccum = self.accum + 2 * AREXP[bigpntr]
             thrdelayreg = self.delayreg
 
             if thraccum > ACCUMMASK:
@@ -268,12 +250,12 @@ class ArithmeticDecoder:
             if symbsmall:
                 self.accum = thraccum
                 self.delayreg = thrdelayreg
-                self.intpntr = ARlog[ARexp[self.intpntr] - ARexp[bigpntr]]
+                self.intpntr = ARLOG[AREXP[self.intpntr] - AREXP[bigpntr]]
             else:
                 self.intpntr = bigpntr
         else:
             bigpntr -= ARENTRIES
-            thraccum = self.accum + ARexp[bigpntr]
+            thraccum = self.accum + AREXP[bigpntr]
             thrdelayreg = self.delayreg
 
             if thraccum > ACCUMMASK:
@@ -288,7 +270,7 @@ class ArithmeticDecoder:
                 self.accum = thraccum
                 self.delayreg = thrdelayreg
                 self.intpntr = (
-                    ARlog[2 * ARexp[self.intpntr] - ARexp[bigpntr]] + ARENTRIES
+                    ARLOG[2 * AREXP[self.intpntr] - AREXP[bigpntr]] + ARENTRIES
                 )
             else:
                 self.intpntr = bigpntr + ARENTRIES
