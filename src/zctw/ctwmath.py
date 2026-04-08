@@ -24,7 +24,7 @@ try:
         if -ent < JACENTRIES:
             return _CTWjac_cython(ent)
         return 0
-except ImportError:
+except (ImportError, AttributeError):
 
     def CTWjac(ent: int) -> int:
         """Jacobian logarithm lookup."""
