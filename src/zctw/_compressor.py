@@ -3,7 +3,7 @@
 import io
 
 from zctw.ctwproc import CTWProb, ctw_process, ctw_steps, ctw_data_from_one_count
-from zctw.ctwtree import CTWTree, byte_bit, byte_prefix
+from zctw.ctwtree import CTWTree, byte_bit, byte_prefix, SHIFT_MASK
 from zctw.header import read_header, write_header
 from zctw.larc import STEPHALF, ArithmeticDecoder, ArithmeticEncoder
 from zctw.settings import CTWSettings, check_settings
@@ -143,7 +143,6 @@ class CTWCompressor:
 
     def _encode_byte(self, u: int) -> None:
         """Encode a single byte."""
-        SHIFT_MASK = (0x00, 0x80, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC, 0xFE)
         settings = self.settings
         tree = self._tree
         encoder = self._encoder
@@ -191,7 +190,6 @@ class CTWCompressor:
 
     def _decode_byte(self) -> int:
         """Decode a single byte."""
-        SHIFT_MASK = (0x00, 0x80, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC, 0xFE)
         settings = self.settings
         tree = self._tree
         decoder = self._decoder

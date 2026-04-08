@@ -318,6 +318,8 @@ class CTWTree:
         "localdepth",
         "_ctxstring",
         "_mask",
+        "_ctwinfo_pool",
+        "_pool_idx",
     )
 
     def __init__(self, settings: CTWSettings):
@@ -336,6 +338,10 @@ class CTWTree:
         self.localdepth: int = 0
         self._ctxstring = [0] * (MAX_TREEDEPTH + 2)
         self._mask: int = 0
+        self._ctwinfo_pool: list[list[tuple[int, int, int]]] = [
+            [(0, 0, 0)] * (MAX_TREEDEPTH + 2) for _ in range(8)
+        ]
+        self._pool_idx: int = 0
 
     def tree_frozen(self) -> bool:
         """Check if tree structure is frozen."""
@@ -424,7 +430,6 @@ class CTWTree:
         maxnrnodes = self.maxnrnodes
         mask = self._mask
         maxnrtries = self.settings.maxnrtries
-        SHIFT_MASK = (0x00, 0x80, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC, 0xFE)
 
         offset = _hash1(ctxstring[ctxdepth - 1], maxnrnodes) ^ ((phase + 1) << 1)
 
@@ -501,17 +506,21 @@ class CTWTree:
         maxnrtries = self.settings.maxnrtries
         filebufsize = self.settings.filebufsize
         strictpruning = self.settings.strictpruning
-        SHIFT_MASK = (0x00, 0x80, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC, 0xFE)
 
         depth = 0
         curindex = rootindex[phase]
-        ctwinfo: list[tuple[int, int, int]] = []
+        ctwinfo = self._ctwinfo_pool[self._pool_idx]
+        self._pool_idx = (self._pool_idx + 1) & 7
+        ctwinfo_len = 0
 
         while True:
             localindex[depth] = curindex
-            ctwinfo.append(
-                (tree_cnt0[curindex], tree_cnt1[curindex], tree_logbeta[curindex])
+            ctwinfo[ctwinfo_len] = (
+                tree_cnt0[curindex],
+                tree_cnt1[curindex],
+                tree_logbeta[curindex],
             )
+            ctwinfo_len += 1
 
             if depth == treedepth_plus1:
                 self.localdepth = treedepth_plus2
@@ -588,7 +597,8 @@ class CTWTree:
                 )
                 self.nrnodes += 1
                 localindex[depth] = newindex
-                ctwinfo.append((0, 0, 0))
+                ctwinfo[ctwinfo_len] = (0, 0, 0)
+                ctwinfo_len += 1
 
                 newsym = ctxstring[depth - 1]
                 if previndex >= 0 and previndex < len(filebuffer):
