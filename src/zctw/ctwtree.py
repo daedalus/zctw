@@ -342,13 +342,17 @@ class CTWTree:
         return self.nrsymbols >= self.settings.filebufsize
 
     def init_filebuffer(self, databytes: int) -> bool:
-        """Allocate file buffer."""
-        size = min(self.settings.filebufsize, databytes)
-        self.filebuffer = bytearray(size)
+        """Allocate file buffer (no longer called during encode for lazy allocation)."""
+        if self.filebuffer is None:
+            size = min(self.settings.filebufsize, databytes)
+            self.filebuffer = bytearray(size)
         return True
 
-    def init_tree(self, sym: int) -> bool:
-        """Initialize tree structure with flat arrays (like C)."""
+    def _ensure_tree_allocated(self) -> bool:
+        """Lazy tree allocation - only allocate when first needed."""
+        if self.tree_symbol is not None:
+            return True
+
         max_nodes = self.settings.maxnrnodes
         self.maxnrnodes = max_nodes
         self._mask = max_nodes - 1
@@ -357,6 +361,21 @@ class CTWTree:
         self.tree_cnt0 = [0] * max_nodes
         self.tree_cnt1 = [0] * max_nodes
         self.tree_logbeta = [0] * max_nodes
+
+        self.nrnodes = 0
+        self.nrfailed = 0
+        return True
+
+    def _ensure_filebuffer_allocated(self, databytes: int) -> None:
+        """Lazy filebuffer allocation."""
+        if self.filebuffer is None:
+            size = min(self.settings.filebufsize, databytes)
+            self.filebuffer = bytearray(size)
+
+    def init_tree(self, sym: int) -> bool:
+        """Initialize tree structure with flat arrays (like C)."""
+        self._ensure_tree_allocated()
+        max_nodes = self.settings.maxnrnodes
 
         for f in range(8):
             i = _hash1(f, max_nodes)
@@ -455,6 +474,18 @@ class CTWTree:
         self, phase: int, context: int, ctxstring: list, curdepth: list
     ) -> list[tuple[int, int, int]]:
         """Find path in CTW tree and return CTW info on path."""
+        if self.tree_symbol is None:
+            self._ensure_tree_allocated()
+            max_nodes = self.settings.maxnrnodes
+            self.maxnrnodes = max_nodes
+            self._mask = max_nodes - 1
+            self.tree_symbol = [EMPTY_NODE] * max_nodes
+            self.tree_cnt0 = [0] * max_nodes
+            self.tree_cnt1 = [0] * max_nodes
+            self.tree_logbeta = [0] * max_nodes
+            self.nrnodes = 0
+            self.nrfailed = 0
+
         tree_symbol = self.tree_symbol
         tree_cnt0 = self.tree_cnt0
         tree_cnt1 = self.tree_cnt1
