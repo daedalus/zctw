@@ -2,6 +2,8 @@
 
 This module handles finding and updating paths in the CTW trees and managing
 the array containing the data of the CTW trees.
+
+Uses flat arrays like the C implementation for performance.
 """
 
 from zctw.settings import MAX_TREEDEPTH, CTWSettings
@@ -22,7 +24,6 @@ def byte_bit(b: int, f: int) -> int:
     return (b >> (7 - f)) & 1
 
 
-# Derived offset table - pseudo-random table for finding locations in tree array
 TPERM = (
     175715,
     11428377,
@@ -288,37 +289,6 @@ def _hash1(c: int, maxnrnodes: int) -> int:
     return TPERM[c] & (maxnrnodes - 1)
 
 
-class CTWRecord:
-    """CTW record containing counts and logbeta for a node."""
-
-    __slots__ = ("cnt", "logbeta")
-
-    def __init__(self, cnt0: int = 0, cnt1: int = 0, logbeta: int = 0):
-        self.cnt = [cnt0, cnt1]
-        self.logbeta = logbeta
-
-    def __repr__(self):
-        return (
-            f"CTWRecord(cnt0={self.cnt[0]}, cnt1={self.cnt[1]}, logbeta={self.logbeta})"
-        )
-
-    def copy(self) -> "CTWRecord":
-        return CTWRecord(self.cnt[0], self.cnt[1], self.logbeta)
-
-
-CTW_DATA_ZERO = CTWRecord(0, 0, 0)
-
-
-class TreeNode:
-    """Tree node containing symbol info and CTW data."""
-
-    __slots__ = ("symbol", "data")
-
-    def __init__(self, symbol: int = EMPTY_NODE, data: CTWRecord | None = None):
-        self.symbol = symbol
-        self.data = data if data is not None else CTW_DATA_ZERO.copy()
-
-
 def _itocptr(i: int, nrtries: int, phase: int) -> int:
     """Convert index, nrtries, phase to symbol pointer."""
     return ((((nrtries - 1) << 3) | phase) << 24) | i
@@ -330,12 +300,34 @@ def _cptrtoi(p: int) -> int:
 
 
 class CTWTree:
-    """CTW tree structure manager."""
+    """CTW tree structure manager using flat arrays for performance."""
+
+    __slots__ = (
+        "settings",
+        "filebuffer",
+        "tree_symbol",
+        "tree_cnt0",
+        "tree_cnt1",
+        "tree_logbeta",
+        "maxnrnodes",
+        "nrnodes",
+        "nrsymbols",
+        "nrfailed",
+        "rootindex",
+        "localindex",
+        "localdepth",
+        "_ctxstring",
+        "_mask",
+    )
 
     def __init__(self, settings: CTWSettings):
         self.settings = settings
         self.filebuffer: bytearray | None = None
-        self.tree: list | None = None
+        self.tree_symbol: list[int] | None = None
+        self.tree_cnt0: list[int] | None = None
+        self.tree_cnt1: list[int] | None = None
+        self.tree_logbeta: list[int] | None = None
+        self.maxnrnodes: int = 0
         self.nrnodes: int = 0
         self.nrsymbols: int = 0
         self.nrfailed: int = 0
@@ -343,6 +335,7 @@ class CTWTree:
         self.localindex = [0] * (MAX_TREEDEPTH + 1)
         self.localdepth: int = 0
         self._ctxstring = [0] * (MAX_TREEDEPTH + 2)
+        self._mask: int = 0
 
     def tree_frozen(self) -> bool:
         """Check if tree structure is frozen."""
@@ -355,26 +348,49 @@ class CTWTree:
         return True
 
     def init_tree(self, sym: int) -> bool:
-        """Initialize tree structure."""
+        """Initialize tree structure with flat arrays (like C)."""
         max_nodes = self.settings.maxnrnodes
+        self.maxnrnodes = max_nodes
+        self._mask = max_nodes - 1
 
-        # Allocate tree array
-        self.tree = [TreeNode() for _ in range(max_nodes)]
+        self.tree_symbol = [EMPTY_NODE] * max_nodes
+        self.tree_cnt0 = [0] * max_nodes
+        self.tree_cnt1 = [0] * max_nodes
+        self.tree_logbeta = [0] * max_nodes
 
-        # Create 8 root nodes (1 for each tree)
         for f in range(8):
             i = _hash1(f, max_nodes)
             self.rootindex[f] = i
-            self.tree[i].symbol = _itocptr(self.settings.treedepth + 2, 1, f)
-            self.tree[i].data = (
-                CTWRecord(cnt0=1, cnt1=0, logbeta=0)
-                if byte_bit(sym, f) == 0
-                else CTWRecord(cnt0=0, cnt1=1, logbeta=0)
-            )
+            self.tree_symbol[i] = _itocptr(self.settings.treedepth + 2, 1, f)
+            if byte_bit(sym, f) == 0:
+                self.tree_cnt0[i] = 1
+            else:
+                self.tree_cnt1[i] = 1
 
         self.nrnodes = 8
         self.nrfailed = 0
         return True
+
+    def _get_node(self, index: int) -> tuple[int, int, int, int]:
+        """Get node data at index."""
+        return (
+            self.tree_symbol[index],
+            self.tree_cnt0[index],
+            self.tree_cnt1[index],
+            self.tree_logbeta[index],
+        )
+
+    def _set_node(self, index: int, cnt0: int, cnt1: int, logbeta: int) -> None:
+        """Set node data at index."""
+        self.tree_cnt0[index] = cnt0
+        self.tree_cnt1[index] = cnt1
+        self.tree_logbeta[index] = logbeta
+
+    def _copy_node(self, dst: int, src: int) -> None:
+        """Copy node data from src to dst."""
+        self.tree_cnt0[dst] = self.tree_cnt0[src]
+        self.tree_cnt1[dst] = self.tree_cnt1[src]
+        self.tree_logbeta[dst] = self.tree_logbeta[src]
 
     def _find_index(
         self, phase: int, curindex: int, ctxdepth: int, ctxstring: list
@@ -384,27 +400,31 @@ class CTWTree:
         Returns:
             (result, newindex): result >= 1 means new node, 0 means old node, -1 means failure
         """
-        offset = _hash1(ctxstring[ctxdepth - 1], self.settings.maxnrnodes) ^ (
-            (phase + 1) << 1
-        )
+        tree_symbol = self.tree_symbol
+        filebuffer = self.filebuffer
+        maxnrnodes = self.maxnrnodes
+        mask = self._mask
+        maxnrtries = self.settings.maxnrtries
+        SHIFT_MASK = (0x00, 0x80, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC, 0xFE)
 
-        for nrtries in range(1, self.settings.maxnrtries + 1):
-            curindex = (curindex + offset) & (self.settings.maxnrnodes - 1)
+        offset = _hash1(ctxstring[ctxdepth - 1], maxnrnodes) ^ ((phase + 1) << 1)
 
-            if self.tree[curindex].symbol == EMPTY_NODE:
-                if self.tree_frozen():
+        for nrtries in range(1, maxnrtries + 1):
+            curindex = (curindex + offset) & mask
+
+            sym = tree_symbol[curindex]
+            if sym == EMPTY_NODE:
+                if self.nrsymbols >= self.settings.filebufsize:
                     return -1, curindex
                 return nrtries, curindex
 
-            # Check if this node matches
-            stored_info = self.tree[curindex].symbol >> 24
-            if (((nrtries - 1) << 3) | phase) == stored_info:
+            stored_info = sym >> 24
+            if ((nrtries - 1) * 8 | phase) == stored_info:
+                idx = sym & 0x00FFFFFF
                 if ctxdepth == 1:
-                    s = byte_prefix(
-                        self.filebuffer[_cptrtoi(self.tree[curindex].symbol)], phase
-                    )
+                    s = filebuffer[idx] & SHIFT_MASK[phase]
                 else:
-                    s = self.filebuffer[_cptrtoi(self.tree[curindex].symbol)]
+                    s = filebuffer[idx]
 
                 if ctxstring[ctxdepth - 1] == s:
                     return 0, curindex
@@ -419,127 +439,203 @@ class CTWTree:
         result, oldindex = self._find_index(phase, curindex, depth, ctxstring)
 
         if result > 0:
-            # New node - initialize
-            self.tree[oldindex].symbol = _itocptr(context, result, phase)
-            self.tree[oldindex].data = self.tree[curindex].data.copy()
+            self.tree_symbol[oldindex] = _itocptr(context, result, phase)
+            self._copy_node(oldindex, curindex)
             self.nrnodes += 1
 
-    def update_path(self, newinfo: list[CTWRecord]) -> None:
+    def update_path(self, newinfo: list[tuple[int, int, int]]) -> None:
         """Update nodes in path with new info."""
         depth = self.localdepth
         while depth > 0:
             depth -= 1
-            self.tree[self.localindex[depth]].data = newinfo[depth]
+            cnt0, cnt1, logbeta = newinfo[depth]
+            self._set_node(self.localindex[depth], cnt0, cnt1, logbeta)
 
     def find_path(
         self, phase: int, context: int, ctxstring: list, curdepth: list
-    ) -> list[CTWRecord]:
+    ) -> list[tuple[int, int, int]]:
         """Find path in CTW tree and return CTW info on path."""
+        tree_symbol = self.tree_symbol
+        tree_cnt0 = self.tree_cnt0
+        tree_cnt1 = self.tree_cnt1
+        tree_logbeta = self.tree_logbeta
+        filebuffer = self.filebuffer
+        localindex = self.localindex
+        rootindex = self.rootindex
+        maxnrnodes = self.maxnrnodes
+        mask = self._mask
+        treedepth = self.settings.treedepth
+        treedepth_plus1 = treedepth + 1
+        treedepth_plus2 = treedepth + 2
+        maxnrtries = self.settings.maxnrtries
+        filebufsize = self.settings.filebufsize
+        strictpruning = self.settings.strictpruning
+        SHIFT_MASK = (0x00, 0x80, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC, 0xFE)
+
         depth = 0
-        curindex = self.rootindex[phase]
-        ctwinfo: list[CTWRecord] = []
+        curindex = rootindex[phase]
+        ctwinfo: list[tuple[int, int, int]] = []
 
         while True:
-            self.localindex[depth] = curindex
-            ctwinfo.append(self.tree[curindex].data.copy())
+            localindex[depth] = curindex
+            ctwinfo.append(
+                (tree_cnt0[curindex], tree_cnt1[curindex], tree_logbeta[curindex])
+            )
 
-            if depth == self.settings.treedepth + 1:
-                self.localdepth = self.settings.treedepth + 2
+            if depth == treedepth_plus1:
+                self.localdepth = treedepth_plus2
                 curdepth[0] = self.localdepth
                 return ctwinfo
 
             depth += 1
             context -= 1
 
-            result, newindex = self._find_index(phase, curindex, depth, ctxstring)
+            offset = _hash1(ctxstring[depth - 1], maxnrnodes) ^ ((phase + 1) << 1)
 
-            if result == -1:
-                self.localdepth = depth
-                curdepth[0] = depth
-                return ctwinfo
-            elif result == 0:
-                curindex = newindex
-            else:
-                # result >= 1: new node, need to extend
-                while True:
-                    previndex = _cptrtoi(self.tree[curindex].symbol) - 1
+            for nrtries in range(1, maxnrtries + 1):
+                curindex = (curindex + offset) & mask
 
-                    # Strict pruning check
-                    if self.settings.strictpruning and previndex != (context + 1):
-                        same = True
-                        for d in range(depth, self.settings.treedepth + 2):
-                            if d == 1:
-                                oldsym = byte_prefix(
-                                    self.filebuffer[previndex + depth - d], phase
-                                )
-                            else:
-                                oldsym = self.filebuffer[previndex + depth - d]
-                            newsym = ctxstring[d - 1]
-                            if oldsym != newsym:
-                                same = False
-                                break
-                        if same:
-                            self.localdepth = depth
-                            curdepth[0] = depth
-                            return ctwinfo
-
-                    # Create new extension
-                    self.tree[newindex].symbol = _itocptr(context + 1, result, phase)
-                    self.tree[newindex].data = CTW_DATA_ZERO.copy()
-                    self.nrnodes += 1
-                    self.localindex[depth] = newindex
-                    ctwinfo.append(CTW_DATA_ZERO.copy())
-
-                    newsym = ctxstring[depth - 1]
-                    if depth == 1:
-                        oldsym = byte_prefix(self.filebuffer[previndex], phase)
-                    else:
-                        oldsym = self.filebuffer[previndex]
-
-                    if oldsym == newsym:
-                        # Contexts coincide - use new node
-                        self.tree[newindex].symbol = _itocptr(previndex, result, phase)
-                        self.tree[newindex].data = self.tree[curindex].data.copy()
-                        curindex = newindex
-                        ctwinfo[depth] = self.tree[curindex].data.copy()
-                    else:
-                        # Create second old leaf and stop
-                        ctxstring[depth - 1] = oldsym
-                        self._find_or_create_old_leaf(
-                            phase, curindex, depth, ctxstring, previndex
-                        )
-                        ctxstring[depth - 1] = newsym
-                        self.localdepth = depth + 1
-                        curdepth[0] = depth + 1
-                        return ctwinfo
-
-                    if depth == self.settings.treedepth + 1:
-                        self.localdepth = self.settings.treedepth + 2
-                        curdepth[0] = self.settings.treedepth + 2
-                        return ctwinfo
-
-                    depth += 1
-                    context -= 1
-                    result, newindex = self._find_index(
-                        phase, curindex, depth, ctxstring
-                    )
-
-                    if result == -1:
-                        newsym = ctxstring[depth - 1]
-                        previndex = _cptrtoi(self.tree[curindex].symbol) - 1
-                        oldsym = self.filebuffer[previndex]
-                        ctxstring[depth - 1] = oldsym
-                        if oldsym != newsym:
-                            self._find_or_create_old_leaf(
-                                phase, curindex, depth, ctxstring, previndex
-                            )
-                        ctxstring[depth - 1] = newsym
+                sym = tree_symbol[curindex]
+                if sym == EMPTY_NODE:
+                    if self.nrsymbols >= filebufsize:
                         self.localdepth = depth
                         curdepth[0] = depth
                         return ctwinfo
-                    elif result == 0:
-                        curindex = newindex
-                    # result >= 1 continues loop
+                    nrtries_result = nrtries
+                    newindex_result = curindex
+                    break
+
+                stored_info = sym >> 24
+                if ((nrtries - 1) * 8 | phase) == stored_info:
+                    idx = sym & 0x00FFFFFF
+                    if idx < len(filebuffer):
+                        if depth == 1:
+                            s = filebuffer[idx] & SHIFT_MASK[phase]
+                        else:
+                            s = filebuffer[idx]
+
+                        if ctxstring[depth - 1] == s:
+                            nrtries_result = 0
+                            newindex_result = curindex
+                            break
+            else:
+                self.nrfailed += 1
+                self.localdepth = depth
+                curdepth[0] = depth
+                return ctwinfo
+
+            if nrtries_result == 0:
+                continue
+
+            newindex = newindex_result
+
+            while True:
+                previndex = (tree_symbol[curindex] & 0x00FFFFFF) - 1
+
+                if strictpruning and previndex >= depth and previndex != (context + 1):
+                    same = True
+                    fb_len = len(filebuffer)
+                    for d in range(depth, treedepth_plus2):
+                        buf_idx = previndex + depth - d
+                        if buf_idx < 0 or buf_idx >= fb_len:
+                            same = False
+                            break
+                        if d == 1:
+                            oldsym = filebuffer[buf_idx] & SHIFT_MASK[phase]
+                        else:
+                            oldsym = filebuffer[buf_idx]
+                        if oldsym != ctxstring[d - 1]:
+                            same = False
+                            break
+                    if same:
+                        self.localdepth = depth
+                        curdepth[0] = depth
+                        return ctwinfo
+
+                tree_symbol[newindex] = (((nrtries_result) << 3) | phase) << 24 | (
+                    context + 1
+                )
+                self.nrnodes += 1
+                localindex[depth] = newindex
+                ctwinfo.append((0, 0, 0))
+
+                newsym = ctxstring[depth - 1]
+                if previndex >= 0 and previndex < len(filebuffer):
+                    if depth == 1:
+                        oldsym = filebuffer[previndex] & SHIFT_MASK[phase]
+                    else:
+                        oldsym = filebuffer[previndex]
+                else:
+                    oldsym = newsym
+
+                if oldsym == newsym:
+                    tree_symbol[newindex] = (
+                        ((nrtries_result) << 3) | phase
+                    ) << 24 | previndex
+                    tree_cnt0[newindex] = tree_cnt0[curindex]
+                    tree_cnt1[newindex] = tree_cnt1[curindex]
+                    tree_logbeta[newindex] = tree_logbeta[curindex]
+                    curindex = newindex
+                    ctwinfo[depth] = (
+                        tree_cnt0[curindex],
+                        tree_cnt1[curindex],
+                        tree_logbeta[curindex],
+                    )
+                else:
+                    ctxstring[depth - 1] = oldsym
+                    self._find_or_create_old_leaf(
+                        phase, curindex, depth, ctxstring, previndex
+                    )
+                    ctxstring[depth - 1] = newsym
+                    self.localdepth = depth + 1
+                    curdepth[0] = depth + 1
+                    return ctwinfo
+
+                if depth == treedepth_plus1:
+                    self.localdepth = treedepth_plus2
+                    curdepth[0] = treedepth_plus2
+                    return ctwinfo
+
+                depth += 1
+                context -= 1
+                offset = _hash1(ctxstring[depth - 1], maxnrnodes) ^ ((phase + 1) << 1)
+
+                for nrtries in range(1, maxnrtries + 1):
+                    curindex = (curindex + offset) & mask
+
+                    sym = tree_symbol[curindex]
+                    if sym == EMPTY_NODE:
+                        if self.nrsymbols >= filebufsize:
+                            self.localdepth = depth
+                            curdepth[0] = depth
+                            return ctwinfo
+                        nrtries_result = nrtries
+                        newindex_result = curindex
+                        break
+
+                    stored_info = sym >> 24
+                    if ((nrtries - 1) * 8 | phase) == stored_info:
+                        idx = sym & 0x00FFFFFF
+                        if idx < len(filebuffer):
+                            if depth == 1:
+                                s = filebuffer[idx] & SHIFT_MASK[phase]
+                            else:
+                                s = filebuffer[idx]
+
+                            if ctxstring[depth - 1] == s:
+                                nrtries_result = 0
+                                newindex_result = curindex
+                                break
+                else:
+                    self.nrfailed += 1
+                    self.localdepth = depth
+                    curdepth[0] = depth
+                    return ctwinfo
+
+                if nrtries_result == 0:
+                    curindex = newindex_result
+                else:
+                    break
 
     def init_ctxstring(self) -> None:
         """Initialize context string from filebuffer."""
@@ -557,4 +653,7 @@ class CTWTree:
     def free_memory(self) -> None:
         """Free allocated memory."""
         self.filebuffer = None
-        self.tree = None
+        self.tree_symbol = None
+        self.tree_cnt0 = None
+        self.tree_cnt1 = None
+        self.tree_logbeta = None

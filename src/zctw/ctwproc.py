@@ -12,7 +12,6 @@ from zctw.ctwmath import (
     CTWzlogpmax,
     CTWzlogpmin,
 )
-from zctw.ctwtree import CTWRecord
 from zctw.settings import CTWSettings
 
 
@@ -26,40 +25,32 @@ class CTWProb:
         self.predsymb = predsymb
 
 
-def ctw_data_from_one_count(bit: int) -> CTWRecord:
-    """Create CTWRecord with one count."""
-    temp = CTWRecord()
-    temp.cnt[bit] = 1
-    temp.cnt[1 - bit] = 0
-    temp.logbeta = 0
-    return temp
+def ctw_data_from_one_count(bit: int) -> tuple[int, int, int]:
+    """Create CTW data tuple with one count (cnt0, cnt1, logbeta)."""
+    return (1 if bit == 0 else 0, 1 if bit == 1 else 0, 0)
 
 
 def ctw_process(
     curdepth: int,
-    ctwinfo: list[CTWRecord],
+    ctwinfo: list[tuple[int, int, int]],
     ctwprob: CTWProb,
-    dummy0info: list[CTWRecord],
-    dummy1info: list[CTWRecord],
+    dummy0info: list[tuple[int, int, int]],
+    dummy1info: list[tuple[int, int, int]],
     settings: CTWSettings,
 ) -> None:
     """Process CTW tree to get weighted probability.
 
     Args:
         curdepth: Current depth in tree.
-        ctwinfo: CTW info for each node on path.
+        ctwinfo: CTW info for each node on path (cnt0, cnt1, logbeta).
         ctwprob: Output probability structure.
         dummy0info: Output for dummy 0 update.
         dummy1info: Output for dummy 1 update.
         settings: CTW settings.
     """
-    # Start with deepest node
     curdepth -= 1
-    data = ctwinfo[curdepth]
-    c0 = data.cnt[0]
-    c1 = data.cnt[1]
+    c0, c1, logbeta = ctwinfo[curdepth]
 
-    # Calculate loggamma using zero-redundancy or KT estimator
     if settings.use_zeroredundancy and (c1 == 0 or c0 == 0):
         if c1 == 0:
             loggamma = CTWzlogpmax[c0] - CTWzlogpmin[c0]
@@ -68,46 +59,38 @@ def ctw_process(
     else:
         loggamma = CTWlogar[2 * c0 + 1] - CTWlogar[2 * c1 + 1]
 
-    # Update counts for dummy0 and dummy1
     if c0 == (MAXCOUNTS - 1):
-        dummy0info[curdepth].cnt[0] = MAXCOUNTS // 2
-        dummy0info[curdepth].cnt[1] = (c1 + 1) // 2
+        dummy0cnt0 = MAXCOUNTS // 2
+        dummy0cnt1 = (c1 + 1) // 2
     else:
-        dummy0info[curdepth].cnt[0] = c0 + 1
-        dummy0info[curdepth].cnt[1] = c1
+        dummy0cnt0 = c0 + 1
+        dummy0cnt1 = c1
 
     if c1 == (MAXCOUNTS - 1):
-        dummy1info[curdepth].cnt[0] = (c0 + 1) // 2
-        dummy1info[curdepth].cnt[1] = MAXCOUNTS // 2
+        dummy1cnt0 = (c0 + 1) // 2
+        dummy1cnt1 = MAXCOUNTS // 2
     else:
-        dummy1info[curdepth].cnt[0] = c0
-        dummy1info[curdepth].cnt[1] = c1 + 1
+        dummy1cnt0 = c0
+        dummy1cnt1 = c1 + 1
 
-    dummy0info[curdepth].logbeta = data.logbeta
-    dummy1info[curdepth].logbeta = data.logbeta
+    dummy0info[curdepth] = (dummy0cnt0, dummy0cnt1, logbeta)
+    dummy1info[curdepth] = (dummy1cnt0, dummy1cnt1, logbeta)
 
-    # Determine end depth based on root weighting
     if settings.rootweighting:
         enddepth = 0
     else:
         enddepth = 1
 
-    # Process remaining nodes
     while curdepth > enddepth:
         curdepth -= 1
-        data = ctwinfo[curdepth]
+        c0, c1, logbeta = ctwinfo[curdepth]
 
-        # Calculate incoming weighted probabilities
         if loggamma >= 0:
             logpw0 = -CTWjac(-loggamma)
             logpw1 = logpw0 - loggamma
         else:
             logpw1 = -CTWjac(loggamma)
             logpw0 = logpw1 + loggamma
-
-        # Calculate conditional estimated probabilities
-        c0 = data.cnt[0]
-        c1 = data.cnt[1]
 
         if settings.use_zeroredundancy and (c1 == 0 or c0 == 0):
             if c1 == 0:
@@ -121,15 +104,14 @@ def ctw_process(
             logpe0 = CTWlogar[2 * c0 + 1] - logcsumplusacc
             logpe1 = CTWlogar[2 * c1 + 1] - logcsumplusacc
 
-        # Calculate new loggamma
-        logbetatimespe0 = data.logbeta + logpe0
+        logbetatimespe0 = logbeta + logpe0
         diff0 = logbetatimespe0 - logpw0
         if diff0 >= 0:
             nom = logbetatimespe0 + CTWjac(-diff0)
         else:
             nom = logpw0 + CTWjac(diff0)
 
-        logbetatimespe1 = data.logbeta + logpe1
+        logbetatimespe1 = logbeta + logpe1
         diff1 = logbetatimespe1 - logpw1
         if diff1 >= 0:
             den = logbetatimespe1 + CTWjac(-diff1)
@@ -138,37 +120,35 @@ def ctw_process(
 
         loggamma = nom - den
 
-        # Update counts for dummy0 and dummy1
         if c0 == (MAXCOUNTS - 1):
-            dummy0info[curdepth].cnt[0] = MAXCOUNTS // 2
-            dummy0info[curdepth].cnt[1] = (c1 + 1) // 2
+            dummy0cnt0 = MAXCOUNTS // 2
+            dummy0cnt1 = (c1 + 1) // 2
         else:
-            dummy0info[curdepth].cnt[0] = c0 + 1
-            dummy0info[curdepth].cnt[1] = c1
+            dummy0cnt0 = c0 + 1
+            dummy0cnt1 = c1
 
         if c1 == (MAXCOUNTS - 1):
-            dummy1info[curdepth].cnt[0] = (c0 + 1) // 2
-            dummy1info[curdepth].cnt[1] = MAXCOUNTS // 2
+            dummy1cnt0 = (c0 + 1) // 2
+            dummy1cnt1 = MAXCOUNTS // 2
         else:
-            dummy1info[curdepth].cnt[0] = c0
-            dummy1info[curdepth].cnt[1] = c1 + 1
+            dummy1cnt0 = c0
+            dummy1cnt1 = c1 + 1
 
-        # Calculate logbeta for dummy updates
         logbetanew0 = logbetatimespe0 - logpw0
         if logbetanew0 > settings.maxlogbeta:
             logbetanew0 = settings.maxlogbeta
         if logbetanew0 < -settings.maxlogbeta:
             logbetanew0 = -settings.maxlogbeta
-        dummy0info[curdepth].logbeta = logbetanew0
 
         logbetanew1 = logbetatimespe1 - logpw1
         if logbetanew1 > settings.maxlogbeta:
             logbetanew1 = settings.maxlogbeta
         if logbetanew1 < -settings.maxlogbeta:
             logbetanew1 = -settings.maxlogbeta
-        dummy1info[curdepth].logbeta = logbetanew1
 
-    # Put weighted probability and most probable symbol in ctwprob
+        dummy0info[curdepth] = (dummy0cnt0, dummy0cnt1, logbetanew0)
+        dummy1info[curdepth] = (dummy1cnt0, dummy1cnt1, logbetanew1)
+
     if loggamma >= 0:
         ctwprob.logpwroot = -CTWjac(-loggamma)
         ctwprob.predsymb = 0
@@ -177,7 +157,6 @@ def ctw_process(
         ctwprob.predsymb = 1
 
 
-# Constant from larc module
 ARENTRIES = 4096
 ACCURACY_CTW = 128
 STEPHALF = ARENTRIES
@@ -192,13 +171,9 @@ def ctw_steps(ctwprob: CTWProb) -> tuple[int, bool]:
     Returns:
         (instep, symbsmall): stepsize and symbol with smallest probability.
     """
-    # Calculate stepsize from logpwroot
     instep = -ctwprob.logpwroot * (ARENTRIES // ACCURACY_CTW)
-
-    # Least probable symbol
     symbsmall = 1 - ctwprob.predsymb
 
-    # Minimum stepsize is 3
     if instep < 3:
         instep = 3
 
