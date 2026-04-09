@@ -22,8 +22,8 @@ jobs:
       - name: Create virtual environment and install build tools
         run: uv venv && uv pip install build twine
 
-      - name: Build package
-        run: uv run python -m build
+      - name: Build package (sdist only, skip wheel)
+        run: uv run python -m build --sdist
 
       - name: Check package
         run: uv run python -m twine check dist/*
