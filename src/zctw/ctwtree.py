@@ -507,11 +507,15 @@ class CTWTree:
         filebufsize = self.settings.filebufsize
         strictpruning = self.settings.strictpruning
 
+        _tperm = TPERM
+
         depth = 0
         curindex = rootindex[phase]
         ctwinfo = self._ctwinfo_pool[self._pool_idx]
         self._pool_idx = (self._pool_idx + 1) & 7
         ctwinfo_len = 0
+        fb_len = len(filebuffer)
+        phase_shift = (phase + 1) << 1
 
         while True:
             localindex[depth] = curindex
@@ -530,7 +534,7 @@ class CTWTree:
             depth += 1
             context -= 1
 
-            offset = _hash1(ctxstring[depth - 1], maxnrnodes) ^ ((phase + 1) << 1)
+            offset = (_tperm[ctxstring[depth - 1]] & (maxnrnodes - 1)) ^ phase_shift
 
             for nrtries in range(1, maxnrtries + 1):
                 curindex = (curindex + offset) & mask
@@ -548,7 +552,7 @@ class CTWTree:
                 stored_info = sym >> 24
                 if ((nrtries - 1) * 8 | phase) == stored_info:
                     idx = sym & 0x00FFFFFF
-                    if idx < len(filebuffer):
+                    if idx < fb_len:
                         if depth == 1:
                             s = filebuffer[idx] & SHIFT_MASK[phase]
                         else:
@@ -574,7 +578,6 @@ class CTWTree:
 
                 if strictpruning and previndex >= depth and previndex != (context + 1):
                     same = True
-                    fb_len = len(filebuffer)
                     for d in range(depth, treedepth_plus2):
                         buf_idx = previndex + depth - d
                         if buf_idx < 0 or buf_idx >= fb_len:
@@ -601,7 +604,7 @@ class CTWTree:
                 ctwinfo_len += 1
 
                 newsym = ctxstring[depth - 1]
-                if previndex >= 0 and previndex < len(filebuffer):
+                if 0 <= previndex < fb_len:
                     if depth == 1:
                         oldsym = filebuffer[previndex] & SHIFT_MASK[phase]
                     else:
@@ -639,7 +642,7 @@ class CTWTree:
 
                 depth += 1
                 context -= 1
-                offset = _hash1(ctxstring[depth - 1], maxnrnodes) ^ ((phase + 1) << 1)
+                offset = (_tperm[ctxstring[depth - 1]] & (maxnrnodes - 1)) ^ phase_shift
 
                 for nrtries in range(1, maxnrtries + 1):
                     curindex = (curindex + offset) & mask
@@ -657,7 +660,7 @@ class CTWTree:
                     stored_info = sym >> 24
                     if ((nrtries - 1) * 8 | phase) == stored_info:
                         idx = sym & 0x00FFFFFF
-                        if idx < len(filebuffer):
+                        if idx < fb_len:
                             if depth == 1:
                                 s = filebuffer[idx] & SHIFT_MASK[phase]
                             else:

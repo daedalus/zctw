@@ -150,10 +150,27 @@ class CTWCompressor:
         dummy0info = self._dummy0info
         dummy1info = self._dummy1info
 
+        treedepth = settings.treedepth
+
+        # Pre-compute bit positions - bit at position p is (u >> (7-p)) & 1
+        phase_bits = (
+            (u >> 7) & 1,
+            (u >> 6) & 1,
+            (u >> 5) & 1,
+            (u >> 4) & 1,
+            (u >> 3) & 1,
+            (u >> 2) & 1,
+            (u >> 1) & 1,
+            u & 1,
+        )
+
+        # Use module-level SHIFT_MASK
+        SHIFT_MASK = (0, 128, 192, 224, 240, 248, 252, 254)
+
         for phase in range(8):
             self._phase = phase
             ctxstring[0] = u & SHIFT_MASK[phase]
-            bit = (u >> (7 - phase)) & 1
+            bit = phase_bits[phase]
 
             ctwinfo = tree.find_path(
                 phase, self._nrsymbols, ctxstring, self._curdepth_list
@@ -178,8 +195,7 @@ class CTWCompressor:
             else:
                 tree.update_path(dummy0info)
 
-        depth_limit = settings.treedepth
-        for depth in range(depth_limit, 0, -1):
+        for depth in range(treedepth, 0, -1):
             ctxstring[depth + 1] = ctxstring[depth]
         ctxstring[1] = u
 
@@ -196,6 +212,10 @@ class CTWCompressor:
         ctxstring = self._ctxstring
         dummy0info = self._dummy0info
         dummy1info = self._dummy1info
+
+        treedepth = settings.treedepth
+        SHIFT_MASK = (0, 128, 192, 224, 240, 248, 252, 254)
+        phase_shifts = (7, 6, 5, 4, 3, 2, 1, 0)
 
         u = 0
         for phase in range(8):
@@ -227,10 +247,9 @@ class CTWCompressor:
                 tree.update_path(dummy0info)
 
             if bit:
-                u |= 1 << (7 - phase)
+                u |= 1 << phase_shifts[phase]
 
-        depth_limit = settings.treedepth
-        for depth in range(depth_limit, 0, -1):
+        for depth in range(treedepth, 0, -1):
             ctxstring[depth + 1] = ctxstring[depth]
         ctxstring[1] = u
 
