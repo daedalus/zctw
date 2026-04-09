@@ -10,7 +10,7 @@ where = ["src"]
 
 [project]
 name = "zctw"
-version = "0.1.0"
+version = "0.1.1"
 description = "Python implementation of Context Tree Weighting (CTW) lossless compression"
 readme = "README.md"
 requires-python = ">=3.11"
